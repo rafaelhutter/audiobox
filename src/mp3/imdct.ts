@@ -192,27 +192,43 @@ export class SynthesisFilterbank {
    */
   process(subbands: Float32Array, out: Float32Array, outOffset: number): void {
     // Advance the ring buffer by one 64-sample vector.
-    this.#offset = (this.#offset - 64 + 1024) % 1024;
+    this.#offset = (this.#offset - 64 + 1024) & 1023;
     const v = this.#v;
     const base = this.#offset;
+
+    // Hoisted: these are module-level bindings, and the inner loops run tens of
+    // millions of times per minute of audio, so the lookup cost is not noise.
+    const cos = SYNTH_COS;
+    const window = SYNTH_WINDOW;
 
     // Matrix the 32 sub-bands into 64 values.
     for (let i = 0; i < 64; i++) {
       let sum = 0;
-      const row = i * 32;
-      for (let k = 0; k < 32; k++) sum += subbands[k]! * SYNTH_COS[row + k]!;
+      const row = i << 5;
+      for (let k = 0; k < 32; k++) sum += subbands[k]! * cos[row + k]!;
       v[base + i] = sum;
     }
 
     // Gather the 512 window taps from the history. The spec's U[] build: eight
     // groups, each taking 32 values from one half of a 128-sample span.
+    //
+    // The wrap uses `& 1023` rather than `% 1024`. They are equivalent here
+    // because the buffer length is a power of two and every index is
+    // non-negative, but this loop runs 512 times per 32 output samples — the
+    // modulo was the single hottest instruction in the decoder.
     for (let j = 0; j < 32; j++) {
       let sum = 0;
+      let evenIndex = (base + j) & 1023;
+      let oddIndex = (base + 96 + j) & 1023;
+      let tap = j;
+
       for (let i = 0; i < 8; i++) {
-        const evenIndex = (base + i * 128 + j) % 1024;
-        const oddIndex = (base + i * 128 + 96 + j) % 1024;
-        sum += v[evenIndex]! * SYNTH_WINDOW[i * 64 + j]!;
-        sum += v[oddIndex]! * SYNTH_WINDOW[i * 64 + 32 + j]!;
+        sum += v[evenIndex]! * window[tap]!;
+        sum += v[oddIndex]! * window[tap + 32]!;
+        // Step forward one 128-sample span instead of recomputing from `base`.
+        evenIndex = (evenIndex + 128) & 1023;
+        oddIndex = (oddIndex + 128) & 1023;
+        tap += 64;
       }
       out[outOffset + j] = sum;
     }

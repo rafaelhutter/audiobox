@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>audiobox — zero-dependency audio for JavaScript</title>
+<meta name="description" content="Decode, edit and encode MP3, WAV, FLAC, AIFF, CAF and AU in the browser, Node, Deno and Bun. Zero dependencies. Try it live in the playground.">
+
+<meta property="og:title" content="audiobox — zero-dependency audio for JavaScript">
+<meta property="og:description" content="Decode, edit and encode MP3, WAV, FLAC, AIFF, CAF and AU. Zero dependencies, runs everywhere. Try it live.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://jmsansan.github.io/audiobox/">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎛️</text></svg>">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<a class="skip" href="#playground">Skip to playground</a>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-mark">🎛️</div>
+    <h1>audiobox</h1>
+    <p class="tagline">
+      Decode, edit and encode audio in JavaScript — <strong>with zero dependencies</strong>.
+      MP3, WAV, FLAC, AIFF, CAF and AU, in the browser, Node, Deno, Bun and edge runtimes.
+    </p>
+
+    <div class="install">
+      <code>npm install audiobox</code>
+      <button class="copy" data-copy="npm install audiobox" title="Copy">Copy</button>
+    </div>
+
+    <div class="badges">
+      <span class="badge"><strong>0</strong> dependencies</span>
+      <span class="badge"><strong>22.9 kB</strong> core, gzipped</span>
+      <span class="badge"><strong>219</strong> tests</span>
+      <span class="badge">MIT</span>
+    </div>
+
+    <nav class="hero-links">
+      <a class="btn primary" href="#playground">Try it live</a>
+      <a class="btn" href="#docs">Documentation</a>
+      <a class="btn" href="https://github.com/jmsansan/audiobox">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ══ PLAYGROUND ══════════════════════════════════════════════════════════ -->
+<section id="playground" class="wrap section">
+  <h2>Playground</h2>
+  <p class="lede">
+    Everything below runs <strong>in your browser</strong>, using the exact package published on
+    npm. Your audio is never uploaded anywhere — there is no server involved.
+  </p>
+
+  <div id="drop" class="drop">
+    <div class="drop-inner">
+      <p class="drop-title">Drop an audio file here</p>
+      <p class="drop-sub">MP3, WAV, FLAC, AIFF, CAF or AU — or</p>
+      <div class="drop-actions">
+        <label class="btn primary">
+          Choose a file<input id="file" type="file" accept="audio/*,.mp3,.wav,.flac,.aif,.aiff,.caf,.au" hidden>
+        </label>
+        <button id="demo" class="btn">Generate a test tone</button>
+      </div>
+      <p class="drop-note" id="loadStatus" role="status" aria-live="polite"></p>
+    </div>
+  </div>
+
+  <div id="workspace" hidden>
+    <!-- File info -->
+    <div class="panel">
+      <h3>Source</h3>
+      <dl class="facts" id="facts"></dl>
+    </div>
+
+    <!-- Waveform -->
+    <div class="panel">
+      <div class="panel-head">
+        <h3>Waveform</h3>
+        <div class="wave-legend">
+          <span><i class="swatch src"></i>source</span>
+          <span><i class="swatch out"></i>result</span>
+        </div>
+      </div>
+      <canvas id="wave" height="180" aria-label="Waveform of the loaded audio"></canvas>
+    </div>
+
+    <!-- Controls -->
+    <div class="panel">
+      <h3>Transform</h3>
+      <div class="controls">
+
+        <fieldset>
+          <legend>Trim</legend>
+          <label>Start <span class="unit">s</span>
+            <input id="trimStart" type="number" min="0" step="0.1" value="0">
+          </label>
+          <label>End <span class="unit">s</span>
+            <input id="trimEnd" type="number" min="0" step="0.1" value="0">
+          </label>
+          <label class="check">
+            <input id="trimSilence" type="checkbox"> Trim silence
+          </label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Channels &amp; rate</legend>
+          <label>Channels
+            <select id="channels">
+              <option value="keep">Keep</option>
+              <option value="1">Mono</option>
+              <option value="2">Stereo</option>
+            </select>
+          </label>
+          <label>Sample rate
+            <select id="rate">
+              <option value="keep">Keep</option>
+              <option value="8000">8 kHz</option>
+              <option value="16000">16 kHz — speech-to-text</option>
+              <option value="22050">22.05 kHz</option>
+              <option value="44100">44.1 kHz</option>
+              <option value="48000">48 kHz</option>
+            </select>
+          </label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Level</legend>
+          <label>Normalise
+            <select id="normMode">
+              <option value="off">Off</option>
+              <option value="peak">Peak (dBFS)</option>
+              <option value="truePeak">True peak (dBTP)</option>
+              <option value="LUFS">Loudness (LUFS)</option>
+            </select>
+          </label>
+          <label>Target <span class="unit">dB</span>
+            <input id="normTarget" type="number" step="0.5" value="-1">
+          </label>
+          <label>Gain <span class="unit">dB</span>
+            <input id="gain" type="number" step="0.5" value="0">
+          </label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Shape</legend>
+          <label>Fade in <span class="unit">s</span>
+            <input id="fadeIn" type="number" min="0" step="0.1" value="0">
+          </label>
+          <label>Fade out <span class="unit">s</span>
+            <input id="fadeOut" type="number" min="0" step="0.1" value="0">
+          </label>
+          <label>Filter
+            <select id="filterType">
+              <option value="none">None</option>
+              <option value="lowpass">Low-pass</option>
+              <option value="highpass">High-pass</option>
+            </select>
+          </label>
+          <label>Cutoff <span class="unit">Hz</span>
+            <input id="filterFreq" type="number" min="20" step="10" value="8000">
+          </label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Time &amp; pitch</legend>
+          <label>Tempo <span class="unit">×</span>
+            <input id="tempo" type="number" min="0.25" max="4" step="0.05" value="1">
+            <small>keeps pitch</small>
+          </label>
+          <label>Pitch <span class="unit">semitones</span>
+            <input id="pitch" type="number" min="-12" max="12" step="1" value="0">
+            <small>keeps duration</small>
+          </label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Output</legend>
+          <label>Format
+            <select id="outFormat">
+              <option value="wav">WAV</option>
+              <option value="flac">FLAC</option>
+              <option value="aiff">AIFF</option>
+              <option value="caf">CAF</option>
+              <option value="au">AU</option>
+            </select>
+          </label>
+          <label>Bit depth
+            <select id="outDepth">
+              <option value="16">16-bit</option>
+              <option value="24">24-bit</option>
+              <option value="32">32-bit float</option>
+              <option value="8">8-bit</option>
+            </select>
+          </label>
+        </fieldset>
+
+      </div>
+
+      <div class="actions">
+        <button id="apply" class="btn primary">Apply</button>
+        <button id="reset" class="btn">Reset</button>
+        <span class="spacer"></span>
+        <button id="playSrc" class="btn">▶ Source</button>
+        <button id="playOut" class="btn" disabled>▶ Result</button>
+        <button id="stop" class="btn">■ Stop</button>
+        <a id="download" class="btn primary" hidden download>↓ Download</a>
+      </div>
+
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+      <dl class="facts" id="outFacts" hidden></dl>
+    </div>
+
+    <!-- Generated code -->
+    <div class="panel">
+      <div class="panel-head">
+        <h3>The equivalent code</h3>
+        <button class="copy" id="copyCode" title="Copy">Copy</button>
+      </div>
+      <p class="hint">This updates as you change the controls above — it is the code that produces
+        exactly the result you just heard.</p>
+      <pre><code id="code"></code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ══ SUPPORT / AD SLOT ═══════════════════════════════════════════════════ -->
+<section class="wrap section support-strip">
+  <div class="support-card">
+    <h3>audiobox is free and MIT-licensed</h3>
+    <p>If it saves you time, sponsoring it is the cheapest way to keep it maintained.</p>
+    <p class="support-links">
+      <a class="btn primary" href="https://github.com/sponsors/jmsansan">♥ GitHub Sponsors</a>
+      <a class="btn" href="https://ko-fi.com/jmsansan">Ko-fi</a>
+    </p>
+  </div>
+
+  <!--
+    Ad slot — deliberately developer-native: contextual, no tracking, no cookies,
+    so no consent banner and no CSP exceptions are needed.
+
+    To enable EthicalAds (https://www.ethicalads.io), replace the placeholder
+    below with:
+
+      <div data-ea-publisher="YOUR_PUBLISHER_ID" data-ea-type="image"></div>
+      <script async src="https://media.ethicalads.io/media/client/ethicalads.min.js"></script>
+
+    Carbon Ads (https://www.carbonads.net) works the same way. The container
+    reserves its height either way, so enabling ads will not shift the layout.
+  -->
+  <aside class="ad-slot" aria-label="Sponsored">
+    <div class="ad-placeholder">
+      <span>Ad slot</span>
+      <small>Reserved for EthicalAds / Carbon — contextual, no tracking</small>
+    </div>
+  </aside>
+</section>
+
+<!-- ══ DOCS ════════════════════════════════════════════════════════════════ -->
+<section id="docs" class="wrap section">
+  <h2>Documentation</h2>
+
+  <div class="doc-nav">
+    <a href="#quickstart">Quick start</a>
+    <a href="#formats">Formats</a>
+    <a href="#recipes">Recipes</a>
+    <a href="#api">API</a>
+    <a href="#errors">Errors</a>
+    <a href="#correctness">Correctness</a>
+  </div>
+
+  <h3 id="quickstart">Quick start</h3>
+  <pre><code>import { decode, encode } from 'audiobox';
+
+const audio = await decode(await file.arrayBuffer());   // format detected from content
+
+const clip = audio
+  .cut({ from: '0:12', to: '1:30' })   // keep 78 seconds
+  .toMono()                            // downmix
+  .resample(16_000)                    // 16 kHz for speech-to-text
+  .normalize({ to: -1 });              // peak to -1 dBFS
+
+const wav = await encode(clip, 'wav', { bitDepth: 16 });</code></pre>
+
+  <p><code>Audio</code> is immutable: every transform returns a new instance, so
+    <code>const original = …</code> stays true.</p>
+
+  <h3 id="formats">Format support</h3>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Format</th><th>Read</th><th>Write</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td><strong>MP3</strong></td><td class="yes">✓</td><td class="no">—</td>
+            <td>MPEG-1/2/2.5 Layer III · 8–48 kHz · CBR + VBR · joint stereo · gapless</td></tr>
+        <tr><td><strong>WAV</strong> / RF64</td><td class="yes">✓</td><td class="yes">✓</td>
+            <td>PCM 8/16/24/32, float 32/64, A-law, µ-law; IMA ADPCM read</td></tr>
+        <tr><td><strong>FLAC</strong></td><td class="yes">✓</td><td class="yes">✓</td><td>Lossless</td></tr>
+        <tr><td><strong>AIFF</strong> / AIFF-C</td><td class="yes">✓</td><td class="yes">✓</td>
+            <td>Including <code>sowt</code>, <code>fl32</code>, <code>fl64</code></td></tr>
+        <tr><td><strong>CAF</strong></td><td class="yes">✓</td><td class="yes">✓</td><td>64-bit sizes, files over 4 GB</td></tr>
+        <tr><td><strong>AU</strong> / SND</td><td class="yes">✓</td><td class="yes">✓</td><td>Sun/NeXT</td></tr>
+        <tr><td>Ogg, MP4, WebM</td><td class="no">—</td><td class="no">—</td>
+            <td>Detected and named in the error, not decoded</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 id="recipes">Recipes</h3>
+
+  <h4>Prepare audio for speech-to-text</h4>
+  <p>Whisper, Deepgram and most ASR APIs want 16 kHz mono 16-bit PCM.</p>
+  <pre><code>const ready = audio.toMono().resample(16_000).normalize({ to: -3 });
+const wav = await encode(ready, 'wav', { bitDepth: 16 });</code></pre>
+  <p class="note">The resampler is windowed-sinc with a proper anti-aliasing cutoff. Downsampling
+    without one folds high frequencies back into the speech band as noise, which measurably hurts
+    transcription accuracy.</p>
+
+  <h4>Normalise a podcast to broadcast loudness</h4>
+  <pre><code>const episode = audio
+  .trimSilence({ threshold: -50, paddingMs: 250 })
+  .fade({ in: 0.5, out: 2, curve: 'equalPower' })
+  .normalize({ to: -16, unit: 'LUFS' });</code></pre>
+  <p class="note"><code>-16 LUFS</code> is <em>loudness</em>, not peak — two episodes normalised
+    this way sound equally loud, which peak normalisation does not achieve. A true-peak ceiling of
+    -1 dBTP is applied automatically so the result cannot clip.</p>
+
+  <h4>Record from the mic, upload something compact</h4>
+  <pre><code>const audio = new Audio([left, right], audioContext.sampleRate);
+
+const flac = await encode(
+  audio.trimSilence({ paddingMs: 100 }).normalize({ to: -1 }),
+  'flac',
+);
+
+await fetch('/upload', { method: 'POST', body: flac });</code></pre>
+
+  <h4>Draw a waveform</h4>
+  <pre><code>const { min, max } = audio.waveform(canvas.width);
+
+for (let x = 0; x &lt; canvas.width; x++) {
+  const top = (0.5 - max[x] / 2) * canvas.height;
+  const bottom = (0.5 - min[x] / 2) * canvas.height;
+  ctx.fillRect(x, top, 1, Math.max(1, bottom - top));
+}</code></pre>
+  <p class="note">Returns per-bucket <strong>extremes</strong>, not averages. Averaging flattens
+    transients and gives you the lifeless waveform displays where you cannot see the beats.</p>
+
+  <h4>Validate an upload without decoding it</h4>
+  <pre><code>import { probeMp3 } from 'audiobox/mp3';
+
+const info = probeMp3(bytes);
+if (info.duration &gt; 600) throw new Error('Too long');</code></pre>
+
+  <h4>Batch-convert a folder in Node</h4>
+  <pre><code>import { readAudioFile, writeAudioFile } from 'audiobox/node';
+import { readdir } from 'node:fs/promises';
+
+for (const name of await readdir('./in')) {
+  const audio = await readAudioFile(`./in/${name}`);
+  await writeAudioFile(`./out/${name.replace(/\.\w+$/, '.flac')}`, audio);
+}</code></pre>
+
+  <h4>Keep the UI responsive</h4>
+  <pre><code>import { runChunked } from 'audiobox/worker';
+
+await runChunked(items, (item) => processOne(item), {
+  onProgress: (p) => setProgress(p),
+  signal: controller.signal,
+});</code></pre>
+
+  <h3 id="api">API</h3>
+
+  <h4><code>decode(input, options?)</code> → <code>Promise&lt;Audio&gt;</code></h4>
+  <p>Accepts <code>Uint8Array</code>, <code>ArrayBuffer</code>, Node <code>Buffer</code>, or any
+    typed-array view. Identifies the format from its <strong>contents</strong>, not its extension.</p>
+  <pre><code>const audio = await decode(bytes, {
+  limits: { maxDurationSeconds: 600 },   // reject anything longer
+  signal: controller.signal,
+});</code></pre>
+
+  <h4><code>encode(audio, format, options?)</code> → <code>Promise&lt;Uint8Array&gt;</code></h4>
+  <pre><code>await encode(audio, 'wav',  { bitDepth: 24 });
+await encode(audio, 'flac', { compressionLevel: 8 });
+await encode(audio, 'aiff', { metadata: { title: 'Take 3' } });</code></pre>
+
+  <h4>Audio methods</h4>
+  <div class="api-groups">
+    <div><h5>Shape</h5><p><code>sampleRate</code> <code>channels</code> <code>frames</code>
+      <code>duration</code> <code>durationFormatted</code> <code>channelData(i)</code>
+      <code>toInterleaved()</code></p></div>
+    <div><h5>Edit</h5><p><code>cut</code> <code>remove</code> <code>concat</code> <code>pad</code>
+      <code>reverse</code> <code>mix</code> <code>crossfadeTo</code></p></div>
+    <div><h5>Convert</h5><p><code>resample</code> <code>toMono</code> <code>toStereo</code>
+      <code>toChannels</code> <code>mapChannels</code> <code>pan</code> <code>split</code></p></div>
+    <div><h5>Level</h5><p><code>gain</code> <code>gainDb</code> <code>normalize</code>
+      <code>normalizeWithReport</code> <code>fade</code></p></div>
+    <div><h5>Process</h5><p><code>filter</code> <code>limit</code> <code>trimSilence</code>
+      <code>detectSilence</code> <code>removeDcOffset</code></p></div>
+    <div><h5>Time</h5><p><code>speed</code> <code>tempo</code> <code>pitch</code></p></div>
+    <div><h5>Measure</h5><p><code>peak</code> <code>peakDb</code> <code>truePeakDb</code>
+      <code>rmsDb</code> <code>loudness</code> <code>waveform</code></p></div>
+  </div>
+
+  <h4>Time positions</h4>
+  <pre><code>audio.cut({ from: 12.5 });               // seconds
+audio.cut({ from: '1:30', to: '2:45' }); // m:ss  or  h:mm:ss.mmm
+audio.cut({ from: '500ms' });            // suffixed
+audio.cut({ from: { sample: 44100 } });  // exact frame index
+audio.cut({ from: -10 });                // last 10 seconds</code></pre>
+
+  <h3 id="errors">Errors</h3>
+  <p>Every error is an <code>AudioboxError</code> with a stable <code>code</code>. Match on the
+    code, never the message.</p>
+  <pre><code>import { AudioboxError } from 'audiobox';
+
+try {
+  await decode(bytes);
+} catch (error) {
+  if (error instanceof AudioboxError) {
+    switch (error.code) {
+      case 'UNSUPPORTED_FORMAT': return reply('That file type is not supported.');
+      case 'DECODE_ERROR':       return reply('That file appears to be corrupt.');
+      case 'LIMIT_EXCEEDED':     return reply('That file is too large.');
+    }
+  }
+  throw error;
+}</code></pre>
+
+  <h3 id="correctness">Correctness</h3>
+  <p>Round-tripping through your own code proves only that it is self-consistent. audiobox is
+    checked against the reference implementations, and those checks run in CI:</p>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Area</th><th>Checked against</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td>WAV, all sample formats</td><td>ffmpeg</td><td class="yes">bit-exact</td></tr>
+        <tr><td>A-law / µ-law</td><td>CPython <code>audioop</code> (ITU G.711 reference)</td><td class="yes">0 mismatches in 2 028 vectors</td></tr>
+        <tr><td>IMA ADPCM</td><td>ffmpeg</td><td class="yes">sample-exact</td></tr>
+        <tr><td>FLAC</td><td>reference <code>flac -t</code> (verifies embedded MD5)</td><td class="yes">passes at every level</td></tr>
+        <tr><td>EBU R128 loudness</td><td>ffmpeg <code>ebur128</code></td><td class="yes">within 0.03 dB</td></tr>
+        <tr><td>MP3 decode</td><td>ffmpeg, 10-case format matrix</td><td class="yes">sample-aligned, 52–64 dB SNR</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<footer class="wrap">
+  <p>
+    <a href="https://github.com/jmsansan/audiobox">GitHub</a> ·
+    <a href="https://www.npmjs.com/package/audiobox">npm</a> ·
+    <a href="https://github.com/jmsansan/audiobox/issues">Issues</a> ·
+    <a href="https://github.com/jmsansan/audiobox/discussions">Discussions</a> ·
+    <a href="https://github.com/sponsors/jmsansan">Sponsor</a>
+  </p>
+  <p class="small">MIT © Jose Sanchez · The playground runs entirely in your browser; no audio is uploaded.</p>
+</footer>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

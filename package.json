@@ -1,6 +1,6 @@
 {
   "name": "audiobox",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Zero-dependency audio toolkit for TypeScript and JavaScript. Decode, convert, cut, resample, normalize and encode audio — MP3, WAV, FLAC, AIFF, CAF, AU — in the browser, Node, Deno, Bun and edge runtimes.",
   "keywords": [
     "audio",

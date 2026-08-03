@@ -5,6 +5,22 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] — 2026-08-03
+
+### Changed
+
+- **MP3 decoding is roughly 14x faster** (25 ms for 3 s of stereo audio on Node 23,
+  about 120x realtime, up from ~9x). The synthesis filterbank wrapped its ring buffer
+  with `%` 512 times per 32 output samples; the buffer length is a power of two and
+  every index is non-negative, so `&` is equivalent and far cheaper. Index stepping and
+  table lookups in the same loop were hoisted. Decoded output is unchanged — the full
+  ffmpeg comparison matrix still reports sample-aligned results at 52-64 dB SNR.
+
+### Added
+
+- Companion site with an in-browser playground, documentation and recipes, published
+  from `docs/` via GitHub Pages.
+
 ## [1.0.0] — 2026-08-03
 
 First release.
@@ -42,4 +58,5 @@ First release.
 - Streaming resampling processes each chunk independently, so filter state does not carry
   across chunk boundaries.
 
+[1.0.1]: https://github.com/jmsansan/audiobox/releases/tag/v1.0.1
 [1.0.0]: https://github.com/jmsansan/audiobox/releases/tag/v1.0.0
