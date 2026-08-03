@@ -1,0 +1,215 @@
+{
+  "name": "audiobox",
+  "version": "1.0.0",
+  "description": "Zero-dependency audio toolkit for TypeScript and JavaScript. Decode, convert, cut, resample, normalize and encode audio — MP3, WAV, FLAC, AIFF, CAF, AU — in the browser, Node, Deno, Bun and edge runtimes.",
+  "keywords": [
+    "audio",
+    "mp3",
+    "wav",
+    "wave",
+    "flac",
+    "aiff",
+    "caf",
+    "pcm",
+    "adpcm",
+    "alaw",
+    "ulaw",
+    "encoder",
+    "decoder",
+    "audio-converter",
+    "resample",
+    "resampler",
+    "convert",
+    "trim",
+    "cut",
+    "normalize",
+    "loudness",
+    "lufs",
+    "ebu-r128",
+    "true-peak",
+    "waveform",
+    "dsp",
+    "time-stretch",
+    "pitch-shift",
+    "webaudio",
+    "audiobuffer",
+    "zero-dependency",
+    "typescript",
+    "esm",
+    "browser",
+    "nodejs",
+    "deno",
+    "bun",
+    "mp3-decoder",
+    "mpeg",
+    "lamejs",
+    "id3"
+  ],
+  "license": "MIT",
+  "author": "Jose Sanchez <jose.sansan@proton.me>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jmsansan/audiobox.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jmsansan/audiobox/issues"
+  },
+  "homepage": "https://github.com/jmsansan/audiobox#readme",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
+    },
+    "./mp3": {
+      "import": {
+        "types": "./dist/esm/mp3/index.d.ts",
+        "default": "./dist/esm/mp3/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/mp3/index.d.ts",
+        "default": "./dist/cjs/mp3/index.js"
+      }
+    },
+    "./flac": {
+      "import": {
+        "types": "./dist/esm/flac/index.d.ts",
+        "default": "./dist/esm/flac/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/flac/index.d.ts",
+        "default": "./dist/cjs/flac/index.js"
+      }
+    },
+    "./analyze": {
+      "import": {
+        "types": "./dist/esm/analyze/index.d.ts",
+        "default": "./dist/esm/analyze/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/analyze/index.d.ts",
+        "default": "./dist/cjs/analyze/index.js"
+      }
+    },
+    "./stream": {
+      "import": {
+        "types": "./dist/esm/stream/index.d.ts",
+        "default": "./dist/esm/stream/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/stream/index.d.ts",
+        "default": "./dist/cjs/stream/index.js"
+      }
+    },
+    "./worker": {
+      "import": {
+        "types": "./dist/esm/worker/index.d.ts",
+        "default": "./dist/esm/worker/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/worker/index.d.ts",
+        "default": "./dist/cjs/worker/index.js"
+      }
+    },
+    "./node": {
+      "import": {
+        "types": "./dist/esm/node/index.d.ts",
+        "default": "./dist/esm/node/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/node/index.d.ts",
+        "default": "./dist/cjs/node/index.js"
+      }
+    },
+    "./webcodecs": {
+      "import": {
+        "types": "./dist/esm/webcodecs/index.d.ts",
+        "default": "./dist/esm/webcodecs/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/webcodecs/index.d.ts",
+        "default": "./dist/cjs/webcodecs/index.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "clean": "node scripts/clean.mjs",
+    "build": "npm run clean && npm run build:esm && npm run build:cjs && npm run build:fixup",
+    "build:esm": "tsc -p tsconfig.esm.json",
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:fixup": "node scripts/fixup.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "test:watch": "node --test --watch \"test/**/*.test.ts\"",
+    "test:coverage": "node --test --experimental-test-coverage \"test/**/*.test.ts\"",
+    "test:fuzz": "node --test test/fuzz.test.ts",
+    "bench": "node bench/index.mjs",
+    "size": "node scripts/size.mjs",
+    "check": "npm run typecheck && npm run portability && npm run test && npm run size",
+    "prepublishOnly": "npm run build && npm run check",
+    "portability": "node scripts/check-isomorphic.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "typesVersions": {
+    "*": {
+      "mp3": [
+        "./dist/esm/mp3/index.d.ts"
+      ],
+      "flac": [
+        "./dist/esm/flac/index.d.ts"
+      ],
+      "analyze": [
+        "./dist/esm/analyze/index.d.ts"
+      ],
+      "stream": [
+        "./dist/esm/stream/index.d.ts"
+      ],
+      "worker": [
+        "./dist/esm/worker/index.d.ts"
+      ],
+      "node": [
+        "./dist/esm/node/index.d.ts"
+      ],
+      "webcodecs": [
+        "./dist/esm/webcodecs/index.d.ts"
+      ]
+    }
+  },
+  "funding": [
+    {
+      "type": "github",
+      "url": "https://github.com/sponsors/jmsansan"
+    },
+    {
+      "type": "ko_fi",
+      "url": "https://ko-fi.com/jmsansan"
+    }
+  ]
+}

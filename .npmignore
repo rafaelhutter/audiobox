@@ -1,0 +1,9 @@
+# `files` in package.json is the allowlist; this is a belt-and-braces backstop
+# so a stray artefact cannot reach the published tarball.
+src/
+test/
+bench/
+examples/
+scripts/
+.github/
+tsconfig*.json

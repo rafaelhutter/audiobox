@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Node ${{ matrix.node }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20', '22', '24']
+        os: [ubuntu-latest]
+        include:
+          # Confirm the byte-order and filesystem assumptions hold off Linux.
+          - node: '22'
+            os: macos-latest
+          - node: '22'
+            os: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - run: npm ci
+
+      # Interop tests compare our output against the reference implementations.
+      # They skip cleanly when absent, so they are installed only where it is
+      # cheap — meaning CI genuinely exercises them rather than silently skipping.
+      - name: Install ffmpeg and flac
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg flac
+
+      - run: npm run typecheck
+      - run: npm run portability
+      - run: npm test
+      - run: npm run build
+      - run: npm run size
+
+  package:
+    name: Package resolution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+      # Catches the dual-publish mistakes that are invisible until a user hits
+      # them: CJS resolving to ESM types, missing subpath declarations, a
+      # `files` list that omits something.
+      - run: npx --yes publint@latest
+      - run: npx --yes @arethetypeswrong/cli@latest --pack --ignore-rules cjs-resolves-to-esm
+
+      - name: Confirm the tarball has no dependencies and no source
+        run: |
+          npm pack --dry-run --json > pack.json
+          node -e "
+            const pkg = require('./package.json');
+            const deps = Object.keys(pkg.dependencies ?? {});
+            if (deps.length) { console.error('Runtime dependencies found:', deps); process.exit(1); }
+            const files = require('./pack.json')[0].files.map(f => f.path);
+            const leaked = files.filter(f => f.startsWith('src/') || f.startsWith('test/'));
+            if (leaked.length) { console.error('Source leaked into tarball:', leaked); process.exit(1); }
+            console.log('Tarball OK:', files.length, 'files, 0 dependencies');
+          "
+
+  cross-runtime:
+    name: Deno and Bun
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Smoke-test on Deno
+        run: deno run --allow-read examples/smoke.mjs
+
+      - uses: oven-sh/setup-bun@v2
+      - name: Smoke-test on Bun
+        run: bun examples/smoke.mjs
+
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+      - uses: github/codeql-action/analyze@v3

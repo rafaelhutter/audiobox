@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Question or discussion
+    url: https://github.com/jmsansan/audiobox/discussions
+    about: Usage questions, ideas, and general discussion.
+  - name: Sponsor audiobox
+    url: https://github.com/sponsors/jmsansan
+    about: Support ongoing maintenance, and help decide what gets built next.
+  - name: Report a security vulnerability
+    url: https://github.com/jmsansan/audiobox/security/advisories/new
+    about: Please report security issues privately, not as a public issue.
