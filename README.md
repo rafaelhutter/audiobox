@@ -464,8 +464,11 @@ npm run build     # dual ESM/CJS build
 ```
 
 Tests run straight from TypeScript source via Node's built-in type stripping, so there is no
-watch-and-rebuild loop. Installing `ffmpeg` and `flac` enables the interop tests; without them
-those tests skip cleanly.
+watch-and-rebuild loop. That needs **Node 22.6+** to develop on — a contributor requirement only.
+The published package is plain JavaScript and supports **Node 20+**, which CI verifies separately
+against the built output.
+
+Installing `ffmpeg` and `flac` enables the interop tests; without them those tests skip cleanly.
 
 ---
 

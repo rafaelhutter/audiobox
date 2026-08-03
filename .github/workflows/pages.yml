@@ -24,7 +24,12 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      # `enablement: true` turns Pages on if it is not already configured for
+      # Actions. Without it the first run fails with "Get Pages site failed",
+      # which is a confusing way to say "go click a setting first".
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: docs

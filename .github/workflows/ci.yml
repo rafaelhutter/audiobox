@@ -14,19 +14,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The test suite runs straight from TypeScript source via Node's built-in type
+  # stripping, which needs Node 22.6+. That is a *contributor* requirement, not a
+  # consumer one — the published package is plain JavaScript. Node 20 support is
+  # verified separately, in the `compat` job below, against the built output.
   test:
-    name: Node ${{ matrix.node }} on ${{ matrix.os }}
+    name: Test — Node ${{ matrix.node }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        node: ['20', '22', '24']
+        node: ['22', '24']
         os: [ubuntu-latest]
         include:
           # Confirm the byte-order and filesystem assumptions hold off Linux.
-          - node: '22'
+          - node: '24'
             os: macos-latest
-          - node: '22'
+          - node: '24'
             os: windows-latest
 
     steps:
@@ -52,6 +56,27 @@ jobs:
       - run: npm run build
       - run: npm run size
 
+  compat:
+    name: Node 20 (minimum supported runtime)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+      # What matters for `engines: node >= 20` is that the *published artifact*
+      # runs there, not that the TypeScript sources do. The smoke test exercises
+      # decode, encode, the DSP chain, and the lazily-imported FLAC codec.
+      - name: Smoke-test the built package
+        run: node examples/smoke.mjs
+
+      - name: Confirm it loads from CommonJS too
+        run: node -e "const {Audio} = require('./dist/cjs/index.js'); console.log(String(new Audio([new Float32Array(44100)], 44100)))"
+
   package:
     name: Package resolution
     runs-on: ubuntu-latest
@@ -59,7 +84,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
       - run: npm ci
       - run: npm run build
@@ -68,7 +93,7 @@ jobs:
       # them: CJS resolving to ESM types, missing subpath declarations, a
       # `files` list that omits something.
       - run: npx --yes publint@latest
-      - run: npx --yes @arethetypeswrong/cli@latest --pack --ignore-rules cjs-resolves-to-esm
+      - run: npx --yes @arethetypeswrong/cli@latest --pack
 
       - name: Confirm the tarball has no dependencies and no source
         run: |
@@ -90,7 +115,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
       - run: npm ci
       - run: npm run build
