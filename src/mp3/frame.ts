@@ -48,6 +48,57 @@ const SAMPLE_RATES: Record<MpegVersion, number[]> = {
   25: [11025, 12000, 8000],
 };
 
+/**
+ * Bitrates the encoder can write, in kbps, indexed by the header's 4-bit field.
+ *
+ * Exported so the encoder writes headers from the same table the decoder reads
+ * them with — the two disagreeing is exactly the kind of bug that produces files
+ * only your own decoder can play.
+ */
+export const MPEG1_LAYER3_BITRATES: readonly number[] = BITRATES_V1_L3;
+
+/**
+ * The bitrates an MPEG-1 Layer III frame can actually be written at, ascending.
+ *
+ * {@link MPEG1_LAYER3_BITRATES} is indexed by the header's 4-bit field, so it
+ * carries two sentinels: index 0 is "free format", where the size is not
+ * declared at all, and index 15 is reserved. Neither is a bitrate, and treating
+ * the raw table as a list of choices means accepting `0` as valid and reading
+ * `-1` as the maximum.
+ */
+export const MPEG1_LAYER3_BITRATE_VALUES: readonly number[] = BITRATES_V1_L3.filter(
+  (kbps) => kbps > 0,
+);
+
+/** Sample rates the encoder can write, indexed by the header's 2-bit field. */
+export const MPEG1_SAMPLE_RATES: readonly number[] = SAMPLE_RATES[1];
+
+/** Header field value for a bitrate in kbps, or -1 if it is not representable. */
+export function bitrateIndex(kbps: number): number {
+  return BITRATES_V1_L3.indexOf(kbps);
+}
+
+/** Header field value for a sample rate in Hz, or -1 if it is not representable. */
+export function sampleRateIndex(hz: number): number {
+  return SAMPLE_RATES[1].indexOf(hz);
+}
+
+/**
+ * Frame length in bytes for MPEG-1 Layer III.
+ *
+ * 1152 samples at `bitrate` bits per second occupy a non-integer number of
+ * bytes at most sample rates, so frames alternate between two sizes; the padding
+ * bit says which. Getting this wrong desynchronises every following frame.
+ */
+export function mpeg1FrameLength(bitrateKbps: number, sampleRate: number, padding: boolean): number {
+  return Math.floor((144 * bitrateKbps * 1000) / sampleRate) + (padding ? 1 : 0);
+}
+
+/** Side-information size in bytes for MPEG-1 Layer III. */
+export function mpeg1SideInfoSize(channels: number): number {
+  return channels === 1 ? 17 : 32;
+}
+
 /** Parses a 4-byte frame header. Returns `null` when the bytes are not a valid header. */
 export function parseFrameHeader(data: Uint8Array, offset: number): FrameHeader | null {
   if (offset + 4 > data.byteLength) return null;
@@ -234,14 +285,27 @@ export function readVbrHeader(
 
     // The LAME tag follows: 9 bytes of encoder name, then a fixed layout in
     // which bytes 21-23 hold 12-bit delay and 12-bit padding.
+    //
+    // Any printable name is accepted, not just the three that dominate. Gating
+    // on a whitelist is what pushes other encoders into labelling themselves
+    // "LAME", and it would make audiobox unable to read its own tag. The risk it
+    // guarded against — reading delay and padding out of bytes that are not a
+    // LAME tag at all — is handled instead by checking the values: a real
+    // encoder delay is a filterbank's worth of samples, not thousands.
     if (p + 24 <= data.byteLength) {
-      const encoder = String.fromCharCode(...data.subarray(p, p + 4));
-      if (encoder === 'LAME' || encoder === 'Lavc' || encoder === 'Lavf') {
-        const delayOffset = p + 21;
-        if (delayOffset + 3 <= data.byteLength) {
-          info.encoderDelay = (data[delayOffset]! << 4) | (data[delayOffset + 1]! >> 4);
-          info.encoderPadding =
-            ((data[delayOffset + 1]! & 0x0f) << 8) | data[delayOffset + 2]!;
+      const printable = isPrintable(data, p, 9);
+      const delayOffset = p + 21;
+
+      if (printable && delayOffset + 3 <= data.byteLength) {
+        const delay = (data[delayOffset]! << 4) | (data[delayOffset + 1]! >> 4);
+        const padding = ((data[delayOffset + 1]! & 0x0f) << 8) | data[delayOffset + 2]!;
+
+        // A frame is 1152 samples; priming beyond about two of them means these
+        // bytes are something else. Padding cannot exceed a frame either, since
+        // more than that would have been one fewer frame.
+        if (delay <= 2 * 1152 && padding <= 3 * 1152) {
+          info.encoderDelay = delay;
+          info.encoderPadding = padding;
         }
       }
     }
@@ -262,6 +326,16 @@ export function readVbrHeader(
   }
 
   return null;
+}
+
+/** True when `count` bytes from `offset` are all printable ASCII or spaces. */
+function isPrintable(data: Uint8Array, offset: number, count: number): boolean {
+  if (offset + count > data.byteLength) return false;
+  for (let i = 0; i < count; i++) {
+    const byte = data[offset + i]!;
+    if (byte < 0x20 || byte > 0x7e) return false;
+  }
+  return true;
 }
 
 function readU32(data: Uint8Array, offset: number): number {

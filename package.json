@@ -1,6 +1,6 @@
 {
   "name": "audiobox",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Zero-dependency audio toolkit for TypeScript and JavaScript. Decode, convert, cut, resample, normalize and encode audio — MP3, WAV, FLAC, AIFF, CAF, AU — in the browser, Node, Deno, Bun and edge runtimes.",
   "keywords": [
     "audio",
@@ -41,8 +41,8 @@
     "deno",
     "bun",
     "mp3-decoder",
+    "mp3-encoder",
     "mpeg",
-    "lamejs",
     "id3"
   ],
   "license": "MIT",
@@ -165,7 +165,7 @@
     "test:fuzz": "node --test test/fuzz.test.ts",
     "bench": "node bench/index.mjs",
     "size": "node scripts/size.mjs",
-    "check": "npm run typecheck && npm run portability && npm run test && npm run size",
+    "check": "npm run typecheck && npm run portability && npm run test && npm run build && npm run size",
     "prepublishOnly": "npm run build && npm run check",
     "portability": "node scripts/check-isomorphic.mjs"
   },

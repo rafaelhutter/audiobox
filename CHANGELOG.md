@@ -5,6 +5,45 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] — 2026-08-04
+
+### Added
+
+- **MP3 encoding.** MPEG-1 Layer III at 32-320 kbit/s, mono or stereo, at 32 / 44.1 / 48 kHz,
+  via `encode(audio, 'mp3', ...)` or `encodeMp3()` from `audiobox/mp3`. Includes a
+  psychoacoustic model, window switching on transients, the bit reservoir, and a Xing/Info
+  tag so `decode(encode(x))` returns exactly the samples it was given. ffmpeg and mpg123
+  decode the output without warnings; ffmpeg measures it at 73 dB against the source on
+  tonal material.
+- **Variable bitrate**, with `{ vbr: true, quality }` where quality runs 0 (best) to 9.
+  Each frame takes the bitrate its content needs, and the stream carries a Xing seek table
+  so players can seek without assuming byte position tracks time. On easy material this is
+  15-25% smaller than constant bitrate at matched quality; on noise there is nothing to
+  save and it does not pretend otherwise.
+- `MPEG1_LAYER3_BITRATE_VALUES` — the 14 bitrates a frame can actually be written at.
+  The existing `MPEG1_LAYER3_BITRATES` is indexed by the header's 4-bit field and carries
+  two sentinels (free format and reserved), which are not bitrates.
+
+### Fixed
+
+- **Gapless decoding lost the last 64 samples of every tagged file.** The trim subtracted
+  this implementation's filterbank offset at the head but never emitted the samples still
+  inside the filterbank at the tail. Files whose padding was at its minimum lost real audio.
+  All ten cases in the ffmpeg comparison matrix now match its output length **exactly**;
+  the assertion was previously a 441-sample tolerance, which is what hid it.
+- The Xing/LAME tag reader no longer requires the encoder to be named `LAME`, `Lavc` or
+  `Lavf`. Any printable encoder name is accepted, with the delay and padding values
+  sanity-checked instead — a whitelist is why other encoders label themselves `LAME`, and
+  it stopped audiobox reading its own tag.
+- `npm run check` measured bundle sizes against a stale `dist/`, so the size budgets were
+  not actually enforced against the code being checked.
+
+### Changed
+
+- `audiobox/mp3` is now 38.6 kB gzipped, up from 17.9 kB, and carries both a decoder and an
+  encoder. It remains outside the core bundle and loads on demand, so the core is unchanged
+  at 22.9 kB.
+
 ## [1.0.1] — 2026-08-03
 
 ### Changed

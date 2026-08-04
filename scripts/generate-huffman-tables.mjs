@@ -14,9 +14,10 @@
  * under CC0 1.0 Universal. CC0 imposes no conditions, so incorporating this data
  * into an MIT-licensed project is unencumbered. audiobox credits it anyway.
  *
- * This matters: LAME is LGPL, and JS MP3 libraries derived from it have inherited
- * licensing ambiguity as a result. Taking the tables from a CC0 source is what
- * keeps audiobox cleanly MIT.
+ * This matters. A codec's tables are the bulk of its substance, and code
+ * translated from a copyleft implementation carries those terms with it however
+ * far the translation goes. Generating from a CC0 source is what keeps audiobox
+ * cleanly MIT — and generating rather than transcribing is what keeps it correct.
  *
  * Usage:
  *   node scripts/generate-huffman-tables.mjs path/to/minimp3.h

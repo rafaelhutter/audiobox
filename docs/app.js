@@ -51,11 +51,34 @@ async function library() {
   try {
     ab = await import(/* @vite-ignore */ CDN);
     setLoad('');
+    void checkMp3Support();
     return ab;
   } catch (error) {
     setLoad(`Could not load audiobox from the CDN — ${error.message}`, true);
     throw error;
   }
+}
+
+/**
+ * Hides the MP3 output option when the loaded build cannot write MP3.
+ *
+ * This page is deployed from the repository but loads the library from npm, so
+ * the two are not always the same version — right after a change lands, and
+ * again while the CDN's cache catches up. Offering an option that fails is worse
+ * than not offering it, and this re-enables itself as soon as the published
+ * build has the encoder.
+ */
+async function checkMp3Support() {
+  const option = control.outFormat.querySelector('option[value="mp3"]');
+  if (!option) return;
+  try {
+    const mp3 = await import(/* @vite-ignore */ CDN.replace('/index.js', '/mp3/index.js'));
+    if (mp3.encodeMp3) return;
+  } catch {
+    /* fall through to hiding it */
+  }
+  option.disabled = true;
+  option.textContent = 'MP3 (not in the published build yet)';
 }
 
 function setLoad(message, isError = false) {
@@ -275,10 +298,25 @@ function pipeline() {
   return steps;
 }
 
+/** Media types for the output blob, so the browser will play it back. */
+const MEDIA_TYPES = {
+  wav: 'audio/wav',
+  mp3: 'audio/mpeg',
+  flac: 'audio/flac',
+  aiff: 'audio/aiff',
+  caf: 'audio/x-caf',
+  au: 'audio/basic',
+};
+
 function encodeOptions() {
   const format = control.outFormat.value;
   const depth = control.outDepth.value;
   if (format === 'flac') return { js: '{ compressionLevel: 5 }', obj: { compressionLevel: 5 } };
+  // MP3 is lossy, so bit depth means nothing to it; variable bitrate is the
+  // setting that matters and the one worth showing.
+  if (format === 'mp3') {
+    return { js: '{ vbr: true, quality: 4 }', obj: { vbr: true, quality: 4 } };
+  }
   return { js: `{ bitDepth: ${depth} }`, obj: { bitDepth: Number(depth) } };
 }
 
@@ -317,7 +355,9 @@ async function apply() {
     ]);
 
     if (objectUrl) URL.revokeObjectURL(objectUrl);
-    objectUrl = URL.createObjectURL(new Blob([output], { type: 'application/octet-stream' }));
+    // A real media type, so "Play output" works rather than the browser
+    // refusing to touch an octet-stream.
+    objectUrl = URL.createObjectURL(new Blob([output], { type: MEDIA_TYPES[format] ?? 'application/octet-stream' }));
     el.download.href = objectUrl;
     el.download.download = `audiobox-output.${format === 'aiff' ? 'aif' : format}`;
     el.download.hidden = false;

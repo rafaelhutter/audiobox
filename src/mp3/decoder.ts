@@ -310,6 +310,30 @@ export function decodeMp3(input: Uint8Array, options?: Mp3DecodeOptions): Decode
     throw new DecodeError('No decodable MP3 frames; the file may be truncated or corrupt.');
   }
 
+  // Flush the synthesis filterbank.
+  //
+  // This implementation's output runs FILTERBANK_OFFSET samples behind a
+  // reference decoder's, so the last of those samples are still inside the
+  // filterbank when the frames run out. Stopping there loses them. Usually they
+  // are padding and nobody notices — but when the encoder's padding is at its
+  // minimum there is no slack, and the tail of the actual audio goes missing.
+  //
+  // Driving the filterbank with silence for the remaining slots emits exactly
+  // what a reference decoder would have produced, and the gapless trim then has
+  // the full stream to work from.
+  {
+    const slots = FILTERBANK_OFFSET / 32;
+    subbandSlot.fill(0);
+    for (let ch = 0; ch < channelCount; ch++) {
+      const channelState = state[ch]!;
+      for (let slot = 0; slot < slots; slot++) {
+        channelState.filterbank.process(subbandSlot, pcm, slot * 32);
+      }
+      sink.write(ch, pcm, FILTERBANK_OFFSET, sink.length);
+    }
+    sink.advance(FILTERBANK_OFFSET);
+  }
+
   // Trim the encoder's priming and padding.
   let skipStart = 0;
   let skipEnd = 0;
@@ -318,6 +342,10 @@ export function decodeMp3(input: Uint8Array, options?: Mp3DecodeOptions): Decode
     // The tag's padding figure already accounts for the encoder's own delay, so
     // the decoder's share has to come back off it — otherwise the tail is
     // over-trimmed by exactly DECODER_DELAY samples.
+    //
+    // No FILTERBANK_OFFSET here, unlike skipStart: the flush above has already
+    // emitted the samples that offset was holding back, so from this point the
+    // stream is the reference one shifted whole, and only the head needs it.
     skipEnd = Math.max(0, (vbrInfo?.encoderPadding ?? 0) - DECODER_DELAY);
     // Padding is only trustworthy alongside a declared frame count.
     if (skipEnd > 0 && skipEnd + skipStart >= sink.length) skipEnd = 0;

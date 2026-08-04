@@ -238,4 +238,16 @@ export class BitWriter {
     this.align();
     return this.buf.slice(0, this.len);
   }
+
+  /**
+   * Discards everything written and reuses the buffer.
+   *
+   * For callers that emit many independent blocks — one per MP3 frame, say — and
+   * would otherwise allocate a writer and let it grow again for each one.
+   */
+  reset(): void {
+    this.len = 0;
+    this.acc = 0;
+    this.accBits = 0;
+  }
 }

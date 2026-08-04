@@ -23,7 +23,11 @@ const distEsm = fileURLToPath(new URL('../dist/esm', import.meta.url));
 // that introduces it rather than in a bug report months later.
 const BUDGETS = {
   '.': 30_000,
-  './mp3': 23_000,
+  // MP3 carries both a decoder and an encoder, and the encode side brought its
+  // own Huffman tables. 40 kB is the ceiling agreed for decode + encode
+  // together, with the psychoacoustic model still to come; the entry is lazily
+  // loaded, so none of it reaches callers who never touch MP3.
+  './mp3': 40_000,
   './flac': 16_000,
   './analyze': 6_000,
   './stream': 17_000,

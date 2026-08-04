@@ -11,6 +11,8 @@
 import { Audio, encode, decode } from '../dist/esm/index.js';
 import { encodeFlac, } from '../dist/esm/flac/encoder.js';
 import { decodeFlac } from '../dist/esm/flac/decoder.js';
+import { encodeMp3 } from '../dist/esm/mp3/encoder.js';
+import { decodeMp3 } from '../dist/esm/mp3/decoder.js';
 import { resampleChannel } from '../dist/esm/dsp/resample.js';
 import { measureLoudness, measureTruePeak } from '../dist/esm/analyze/loudness.js';
 
@@ -67,12 +69,19 @@ await measure('WAV 24-bit', 5, () => encode(audio, 'wav', { bitDepth: 24 }));
 await measure('FLAC level 0', 3, () => encodeFlac(audio, { compressionLevel: 0 }));
 await measure('FLAC level 5 (default)', 3, () => encodeFlac(audio, { compressionLevel: 5 }));
 await measure('FLAC level 8', 2, () => encodeFlac(audio, { compressionLevel: 8 }));
+await measure('MP3 192k CBR', 2, () => encodeMp3(audio, { bitrate: 192 }));
+await measure('MP3 192k CBR, no psy model', 2, () =>
+  encodeMp3(audio, { bitrate: 192, psychoacoustic: false }),
+);
+await measure('MP3 VBR q4', 2, () => encodeMp3(audio, { bitrate: 192, vbr: true }));
 
 console.log('\nDecoding');
 const wavBytes = await encode(audio, 'wav', { bitDepth: 16 });
 const flacBytes = encodeFlac(audio, { compressionLevel: 5 });
+const mp3Bytes = encodeMp3(audio, { bitrate: 192 });
 await measure('WAV 16-bit', 5, () => decode(wavBytes));
 await measure('FLAC', 3, () => decodeFlac(flacBytes));
+await measure('MP3', 3, () => decodeMp3(mp3Bytes));
 
 console.log('\nResampling (44.1 kHz source)');
 await measure('-> 48 kHz, sinc (default)', 3, () => resampleChannel(source[0], RATE, 48000));
@@ -98,4 +107,12 @@ await measure('stereo -> mono', 5, () => audio.toMono());
 
 const flacRatio = (flacBytes.byteLength / wavBytes.byteLength) * 100;
 console.log(`\nFLAC compression: ${flacRatio.toFixed(1)}% of WAV size`);
+console.log(`MP3 192k CBR:     ${((100 * mp3Bytes.byteLength) / wavBytes.byteLength).toFixed(1)}% of WAV size`);
+
+const vbrBytes = encodeMp3(audio, { bitrate: 192, vbr: true });
+console.log(
+  `MP3 VBR q4:       ${((100 * vbrBytes.byteLength) / wavBytes.byteLength).toFixed(1)}% of WAV size` +
+    ` (${((vbrBytes.byteLength * 8) / SECONDS / 1000).toFixed(0)} kbit/s average)`,
+);
+
 console.log('\nAnything above ~50×RT will encode a 3-minute track in under 4 seconds.');

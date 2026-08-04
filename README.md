@@ -2,8 +2,8 @@
 
 **Audio decoding, editing and encoding for TypeScript and JavaScript — with zero dependencies.**
 
-One API that reads MP3, WAV, FLAC, AIFF, CAF and AU, edits and converts them, and writes them back
-out. The same code runs unchanged in the browser, Node, Deno, Bun and edge runtimes. No native
+One API that reads and writes MP3, WAV, FLAC, AIFF, CAF and AU, and edits and converts between
+them. The same code runs unchanged in the browser, Node, Deno, Bun and edge runtimes. No native
 build step, no WebAssembly blob, nothing installed alongside it.
 
 [![npm](https://img.shields.io/npm/v/audiobox.svg)](https://www.npmjs.com/package/audiobox)
@@ -63,7 +63,7 @@ limiter, silence trimming, DC-offset removal, time-stretch and pitch-shift.
 
 | Format | Read | Write | Notes |
 | --- | :---: | :---: | --- |
-| **MP3** | ✅ | — | MPEG-1/2/2.5 Layer III · 8–48 kHz · CBR + VBR · joint stereo · gapless |
+| **MP3** | ✅ | ✅ | Read: MPEG-1/2/2.5 · 8–48 kHz · CBR + VBR · joint stereo · gapless. Write: MPEG-1 · 32/44.1/48 kHz · 32–320 kbit/s · CBR + VBR |
 | **WAV** / RF64 / BW64 | ✅ | ✅ | PCM 8/16/24/32, float 32/64, A-law, µ-law; IMA ADPCM read |
 | **FLAC** | ✅ | ✅ | Lossless |
 | **AIFF** / AIFF-C | ✅ | ✅ | Including `sowt` (little-endian PCM), `fl32`, `fl64` |
@@ -79,6 +79,25 @@ as a click at each end.
 There is also `probeMp3()`, which reads duration, bitrate, channel mode and tags **without**
 decoding. It is near-instant even on a large file and never allocates a decode buffer, which makes
 it the right tool for validating an upload.
+
+**MP3 encoding** writes MPEG-1 Layer III at 32–320 kbit/s, mono or stereo, at 32 / 44.1 / 48 kHz,
+constant or variable bitrate. It has a psychoacoustic model, switches to short blocks on transients
+to control pre-echo, uses the bit reservoir, and writes a Xing/Info tag so `decode(encode(x))`
+returns exactly the samples it was given.
+
+Measured, on this machine, at 44.1 kHz:
+
+| | |
+| --- | --- |
+| ffmpeg's decode of our output, against the source | **73 dB** on tonal material |
+| Noise shaping, on dense material at 128 kbit/s | noise-to-mask **−6.7 → −10.5 dB**; audible bands 49% → 20% |
+| Short blocks, on transients | pre-echo **−27 → −34 dB** |
+| VBR against CBR at matched quality | **15–25% smaller** on easy material, no saving on noise |
+| Throughput | ~26×realtime CBR, ~13× VBR, ~110× decoding |
+
+Encoding is not the equal of a mature encoder at low bitrates — the model is a simplification, and
+stereo is coded as two independent channels rather than jointly. Above about 192 kbit/s that stops
+being the limiting factor. The figures above are what the tests assert, not estimates.
 
 ---
 
@@ -117,6 +136,17 @@ await fetch('/upload', { method: 'POST', body: flac });
 
 FLAC is lossless and typically 40–60 % of the WAV size, so nothing is thrown away on the way to
 your server.
+
+When the upload has to be small rather than exact — a voice note, a preview, anything a user will
+listen to once — MP3 is the format everything already plays:
+
+```ts
+const mp3 = await encode(audio.normalize({ to: -1 }), 'mp3', { vbr: true, quality: 4 });
+```
+
+Variable bitrate spends bits where the material needs them and stops where it does not, so a quiet
+recording comes out considerably smaller than a fixed bitrate would give you at the same quality.
+Pass `{ bitrate: 128 }` instead when something downstream needs a predictable size.
 
 ### Prepare audio for speech-to-text
 
@@ -248,7 +278,12 @@ await encode(audio, 'wav',  { bitDepth: 24 });
 await encode(audio, 'wav',  { sampleFormat: 'ulaw' });
 await encode(audio, 'flac', { compressionLevel: 8 });
 await encode(audio, 'aiff', { metadata: { title: 'Take 3' } });
+await encode(audio, 'mp3',  { bitrate: 192 });
+await encode(audio, 'mp3',  { vbr: true, quality: 2 });   // bitrate becomes a ceiling
 ```
+
+MP3 options: `bitrate` (32–320, default 192), `vbr`, `quality` (0 best … 9 smallest, default 4),
+and `tag` to suppress the leading Xing/Info frame when the output is a fragment to be concatenated.
 
 ### `Audio`
 
@@ -322,14 +357,20 @@ against the reference implementations, and those checks run in CI:
 | FLAC | reference `flac -t`, which verifies the embedded MD5 | **passes** at every level |
 | FLAC decode | reference `flac` decoder | **identical** |
 | EBU R128 loudness | ffmpeg `ebur128` | within **0.03 dB** |
-| MP3 decode | ffmpeg, across a 10-case format matrix | **sample-aligned**, 52–64 dB SNR |
+| MP3 decode | ffmpeg, across a 10-case format matrix | **sample-aligned**, 52–64 dB SNR, exact length |
+| MP3 encode | ffmpeg and mpg123 decode our files | **no warnings**, 73 dB against the source |
 
 Two ISO-compliant MP3 decoders never agree bit-for-bit — they differ in float precision — so the
 bar there is SNR, plus a hard assertion that the decoded audio starts at the *same sample* as the
-reference. A decoder can be spectrally perfect and still useless for editing if it disagrees about
-where the audio begins.
+reference and is the *same length*. A decoder can be spectrally perfect and still useless for
+editing if it disagrees about where the audio begins.
 
-The suite is ~220 tests and runs in a few seconds. Interop tests skip automatically when `ffmpeg`
+The encoder is checked the same way round: what an independent decoder makes of our output. That
+distinction is not academic — a round trip through a matched pair cannot tell a correct transform
+from two compensating errors, and during development an analysis window that scored 41 dB through
+our own decoder scored 41 dB through ffmpeg too, while the correct one scored 73.
+
+The suite is ~270 tests and runs in a few seconds. Interop tests skip automatically when `ffmpeg`
 and `flac` are not installed, so contributors without them still get a green run.
 
 ---
@@ -376,14 +417,15 @@ Measured gzipped, including everything each entry point transitively imports:
 | Entry point | Gzipped |
 | --- | --- |
 | `audiobox` | **22.9 kB** |
-| `audiobox/mp3` | 17.9 kB |
+| `audiobox/mp3` | 38.6 kB |
 | `audiobox/stream` | 13.4 kB |
 | `audiobox/flac` | 11.9 kB |
 | `audiobox/analyze` | 3.7 kB |
 | `audiobox/worker` | 1.4 kB |
 
-A complete MP3 decoder in under 18 kB, and it is **not** in the core bundle — `decode()` loads it
-on demand, so a project that only handles WAV never downloads it. The package is
+A complete MP3 decoder *and* encoder — filterbanks, Huffman tables in both directions, and a
+psychoacoustic model — in under 40 kB, and **not** in the core bundle: `decode()` and `encode()`
+load it on demand, so a project that only handles WAV never downloads it. The package is
 `sideEffects: false` and each subpath is a separate entry point, so bundlers drop what you do not
 use. CI enforces a size budget per entry point.
 
@@ -416,7 +458,8 @@ and [arethetypeswrong](https://arethetypeswrong.github.io).
 
 This section says what is *not* here yet.
 
-- **MP3 encoding** — the largest remaining item. The decoder now exists to verify it against.
+- **Joint stereo for MP3 encoding** — the two channels are currently coded independently, which
+  costs bitrate on correlated material. Decoding already handles both mid/side and intensity.
 - **Ogg/Opus and Vorbis** — under consideration. Large, and WebCodecs already covers the browser
   case.
 - **A turnkey worker** — currently a protocol you wire up; a ready-made version needs per-bundler
@@ -427,12 +470,18 @@ This section says what is *not* here yet.
 MP3 is **patent-free**. The last US patent expired on 16 April 2017 and the licensing programme was
 terminated a week later. There is no royalty question.
 
-The *copyright* question is the one that matters, and it is why some JavaScript MP3 libraries have
-unclear licensing: LAME is LGPL, so anything derived from it — including a port, or a port of a
-port — inherits that. audiobox does not do this. The Huffman tables are generated from
-[minimp3](https://github.com/lieff/minimp3) (CC0 / public domain), the synthesis filter window is
-solved for numerically rather than copied from anywhere, and everything else follows the ISO
-specification. audiobox is cleanly MIT and safe to use in commercial products.
+The *copyright* question is the one that matters. A codec carries large tables, and where those
+tables came from decides what licence the result can carry — code translated from a copyleft
+implementation inherits its terms, however far the translation goes.
+
+audiobox derives its own. The Huffman decode tables are generated from
+[minimp3](https://github.com/lieff/minimp3) (CC0 / public domain) by a script in the repository;
+the Huffman *encode* tables are then derived from those by walking the decode trie; the analysis and
+synthesis filter windows are solved for numerically; and everything else follows the ISO
+specification. Each generator verifies its own output — Kraft equality, decode round-trips, perfect
+reconstruction — so the tables are checked rather than trusted.
+
+audiobox is cleanly MIT and safe to use in commercial products.
 
 ---
 

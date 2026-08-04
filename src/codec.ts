@@ -144,6 +144,7 @@ export interface EncodeOptionsByFormat {
   au: ContainerEncodeOptions;
   caf: ContainerEncodeOptions;
   flac: import('./flac/encoder.ts').FlacEncodeOptions;
+  mp3: import('./mp3/encoder.ts').Mp3EncodeOptions;
   raw: ContainerEncodeOptions;
 }
 
@@ -188,6 +189,10 @@ export async function encode<F extends EncodableFormat>(
   if (format === 'flac') {
     const { encodeFlac } = await import('./flac/index.ts');
     return encodeFlac(audio, options as EncodeOptionsByFormat['flac']);
+  }
+  if (format === 'mp3') {
+    const { encodeMp3 } = await import('./mp3/index.ts');
+    return encodeMp3(audio, options as EncodeOptionsByFormat['mp3']);
   }
   throw new UnsupportedFormatError(`No encoder registered for "${format}".`);
 }

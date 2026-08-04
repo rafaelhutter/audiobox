@@ -36,7 +36,7 @@
     <div class="badges">
       <span class="badge"><strong>0</strong> dependencies</span>
       <span class="badge"><strong>22.9 kB</strong> core, gzipped</span>
-      <span class="badge"><strong>219</strong> tests</span>
+      <span class="badge"><strong>272</strong> tests</span>
       <span class="badge">MIT</span>
     </div>
 
@@ -183,6 +183,7 @@
           <label>Format
             <select id="outFormat">
               <option value="wav">WAV</option>
+              <option value="mp3">MP3</option>
               <option value="flac">FLAC</option>
               <option value="aiff">AIFF</option>
               <option value="caf">CAF</option>
@@ -294,8 +295,8 @@ const wav = await encode(clip, 'wav', { bitDepth: 16 });</code></pre>
     <table>
       <thead><tr><th>Format</th><th>Read</th><th>Write</th><th>Notes</th></tr></thead>
       <tbody>
-        <tr><td><strong>MP3</strong></td><td class="yes">✓</td><td class="no">—</td>
-            <td>MPEG-1/2/2.5 Layer III · 8–48 kHz · CBR + VBR · joint stereo · gapless</td></tr>
+        <tr><td><strong>MP3</strong></td><td class="yes">✓</td><td class="yes">✓</td>
+            <td>Read: MPEG-1/2/2.5 · 8–48 kHz · joint stereo · gapless. Write: MPEG-1 · 32/44.1/48 kHz · 32–320 kbit/s · CBR + VBR</td></tr>
         <tr><td><strong>WAV</strong> / RF64</td><td class="yes">✓</td><td class="yes">✓</td>
             <td>PCM 8/16/24/32, float 32/64, A-law, µ-law; IMA ADPCM read</td></tr>
         <tr><td><strong>FLAC</strong></td><td class="yes">✓</td><td class="yes">✓</td><td>Lossless</td></tr>
@@ -442,7 +443,8 @@ try {
         <tr><td>IMA ADPCM</td><td>ffmpeg</td><td class="yes">sample-exact</td></tr>
         <tr><td>FLAC</td><td>reference <code>flac -t</code> (verifies embedded MD5)</td><td class="yes">passes at every level</td></tr>
         <tr><td>EBU R128 loudness</td><td>ffmpeg <code>ebur128</code></td><td class="yes">within 0.03 dB</td></tr>
-        <tr><td>MP3 decode</td><td>ffmpeg, 10-case format matrix</td><td class="yes">sample-aligned, 52–64 dB SNR</td></tr>
+        <tr><td>MP3 decode</td><td>ffmpeg, 10-case format matrix</td><td class="yes">sample-aligned, 52–64 dB SNR, exact length</td></tr>
+        <tr><td>MP3 encode</td><td>ffmpeg and mpg123 decode our files</td><td class="yes">no warnings, 73 dB vs source</td></tr>
       </tbody>
     </table>
   </div>
