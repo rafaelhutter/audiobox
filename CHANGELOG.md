@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   before it reports the encoder name.
 - **MP3 tag music length.** Bytes 28-31 of the LAME extension left out the tag frame. They now
   count from it, as LAME and ffmpeg do, so they equal the Xing byte count.
+- **MP3 gapless decoding of LAME files with a short encoder name.** The reader accepted only
+  printable bytes in the 9-byte name, but LAME 4.0 pads `LAME4.0 ` with a NUL byte. Such files
+  decoded with the priming and padding left in. Trailing NUL bytes are now accepted.
 
 ## [1.1.0] — 2026-08-04
 

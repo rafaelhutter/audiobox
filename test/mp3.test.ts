@@ -1717,6 +1717,15 @@ describe('MP3 encoding through the library', () => {
     }
   });
 
+  test('an encoder name padded with NUL bytes is read, as LAME writes short names', () => {
+    const signal = music(RATE);
+    const bytes = encodeMp3Channels([signal], RATE, { bitrate: 128 });
+    const first = findFrame(bytes, 0)!;
+    bytes.set(new TextEncoder().encode('LAME4.0 \0'), first.offset + TAG_ENCODER_OFFSET);
+    assert.equal(readVbrHeader(bytes, first.offset, first.header)!.encoderDelay, ENCODER_DELAY);
+    assert.equal(decodeMp3(bytes).channelData[0]!.length, signal.length);
+  });
+
   test('a tag from any encoder is read, not just LAME’s', () => {
     // Gating on a whitelist of encoder names is why other encoders label
     // themselves "LAME". audiobox names itself honestly, so the reader has to
