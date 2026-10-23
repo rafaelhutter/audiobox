@@ -1628,6 +1628,9 @@ describe('MP3 encoding through the library', () => {
     assert.equal(tag.vbr, false, 'CBR streams are tagged Info, not Xing');
     assert.equal(tag.bytes, bytes.byteLength, 'declared byte count is wrong');
     assert.equal(tag.encoderDelay, ENCODER_DELAY);
+    const lameAt = first.offset + TAG_ENCODER_OFFSET;
+    assert.equal(bytes[lameAt + 9]! & 0x0f, 1, 'the VBR method does not say constant bitrate');
+    assert.equal(bytes[lameAt + 20], 128, 'byte 20 is not the constant bitrate');
 
     // The count excludes the tag frame itself, which is what a decoder assumes
     // when it skips that frame and then sizes its output buffer.
@@ -2455,6 +2458,14 @@ describe('MP3 variable bitrate', () => {
       assert.ok(entry >= previous, `seek table is not monotone at entry ${i}`);
       previous = entry;
     }
+  });
+
+  test('the LAME extension describes a variable-bitrate stream as VBR', () => {
+    const bytes = encodeMp3Channels([material('quiet')], RATE, { bitrate: 192, vbr: true });
+    // After the header, side info, `Xing`, flags, both counts and the seek table.
+    const lameAt = findFrame(bytes, 0)!.offset + 4 + 17 + 4 + 4 + 4 + 4 + 100;
+    assert.equal(bytes[lameAt + 9]! & 0x0f, 4, 'the VBR method still says constant bitrate');
+    assert.equal(bytes[lameAt + 20], 32, 'byte 20 is not the lowest bitrate a frame may take');
   });
 
   test('a variable-bitrate round trip is still gapless', () => {

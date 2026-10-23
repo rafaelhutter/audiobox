@@ -38,6 +38,7 @@ import {
   mpeg1FrameLength,
   mpeg1SideInfoSize,
   MPEG1_LAYER3_BITRATES,
+  MPEG1_LAYER3_BITRATE_VALUES,
   MPEG1_SAMPLE_RATES,
 } from './frame.ts';
 import type { ChannelMode } from './frame.ts';
@@ -122,9 +123,11 @@ export function writeInfoTag(params: InfoTagParameters): Uint8Array {
   p = writeAscii(frame, p, ENCODER_STRING);
 
   // Bytes 9-20 of the extension: VBR method, lowpass, replay gain, flags.
-  // Byte 9's low nibble is the VBR method; 1 means constant bitrate.
-  frame[lameStart + 9] = 0x01;
-  frame[lameStart + 20] = Math.min(255, bitrateKbps);
+  // Byte 9's low nibble is the VBR method: 1 constant, 4 variable bitrate.
+  frame[lameStart + 9] = params.vbr ? 0x04 : 0x01;
+  // Byte 20 is the bitrate for CBR, and for VBR the lowest one a frame may take.
+  const lowestKbps = params.vbr ? MPEG1_LAYER3_BITRATE_VALUES[0]! : bitrateKbps;
+  frame[lameStart + 20] = Math.min(255, lowestKbps);
 
   // Bytes 21-23: 12 bits of delay followed by 12 bits of padding.
   frame[lameStart + 21] = (encoderDelay >> 4) & 0xff;
