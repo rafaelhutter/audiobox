@@ -1707,6 +1707,27 @@ describe('MP3 encoding through the library', () => {
     const tag = readVbrHeader(corrupt, first.offset, first.header)!;
     assert.equal(tag.encoderDelay, undefined, 'an implausible delay should be ignored');
   });
+
+  test('a caller-chosen encoder name is written padded and still read back', () => {
+    const options = { bitrate: 128, encoderName: 'LAME' };
+    const bytes = encodeMp3Channels([music(RATE)], RATE, options);
+    const name = findFrame(bytes, 0)!.offset + TAG_ENCODER_OFFSET;
+    assert.equal(String.fromCharCode(...bytes.subarray(name, name + 9)), 'LAME     ');
+    const decoded = decodeMp3(bytes).channelData[0]!;
+    assert.equal(decoded.length, RATE, 'the round trip is no longer gapless');
+  });
+
+  test('an encoder name that decoders would misread is refused', () => {
+    const signal = new Float32Array(1152);
+    const refused = ['', ' LAME', 'audiobox-2', 'naïve', 'tab\there', 'LAME\x7f', 5n];
+    for (const encoderName of refused as string[]) {
+      assert.throws(
+        () => encodeMp3Channels([signal], RATE, { encoderName }),
+        { code: 'INVALID_ARGUMENT', message: /encoderName/ },
+        String(encoderName),
+      );
+    }
+  });
 });
 
 describe('MP3 encoding against ffmpeg', { skip: FFMPEG ? false : 'ffmpeg not installed' }, () => {
@@ -1838,6 +1859,35 @@ describe('MP3 encoding against ffmpeg', { skip: FFMPEG ? false : 'ffmpeg not ins
     }
     const quality = 10 * Math.log10(signal / error);
     assert.ok(quality > 40, `ffmpeg heard only ${quality.toFixed(1)} dB against the source`);
+  });
+
+  test('a LAME-prefixed encoder name lets ffmpeg trim to the exact input', () => {
+    const source = [music(RATE * 2), music(RATE * 2, 110)];
+    const path = join(dir, 'enc-lame-name.mp3');
+    const options = { bitrate: 192, encoderName: 'LAME' };
+    writeFileSync(path, encodeMp3Channels(source, RATE, options));
+
+    const raw = join(dir, 'enc-lame-name.raw');
+    const run = spawnSync('ffmpeg', ['-v', 'warning', '-i', path, '-f', 'f32le', raw, '-y'], {
+      encoding: 'utf8',
+    });
+    assert.equal(run.status, 0, 'ffmpeg exited non-zero');
+    assert.equal(run.stderr.trim(), '', 'ffmpeg reported a problem with our stream');
+
+    const buffer = readFileSync(raw);
+    const reference = new Float32Array(buffer.buffer, buffer.byteOffset, buffer.byteLength / 4);
+    const frames = reference.length / 2;
+    assert.equal(frames, source[0]!.length, 'ffmpeg did not trim to the input length');
+
+    // Lag zero: ffmpeg applied our delay. A one-sample slip would score about 17 dB here.
+    let signal = 0;
+    let error = 0;
+    for (let i = 4000; i < 60000; i++) {
+      signal += source[0]![i]! ** 2;
+      error += (source[0]![i]! - reference[i * 2]!) ** 2;
+    }
+    const quality = 10 * Math.log10(signal / error);
+    assert.ok(quality > 40, `ffmpeg's trimmed decode is ${quality.toFixed(1)} dB at lag zero`);
   });
 });
 
