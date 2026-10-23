@@ -65,8 +65,8 @@ export interface InfoTagParameters {
   encoderPadding: number;
   /** Variable bitrate: tag as `Xing` and carry a seek table. */
   vbr?: boolean;
-  /** The assembled audio frames, needed to build the seek table. */
-  frames?: Uint8Array;
+  /** The assembled audio frames, for the music CRC and the VBR seek table. */
+  frames: Uint8Array;
   /** Size of this tag frame, since it precedes `frames` in the stream. */
   tagBytes?: number;
 }
@@ -103,7 +103,7 @@ export function writeInfoTag(params: InfoTagParameters): Uint8Array {
 
   // `Info` and `Xing` are the same structure; the name is how a decoder tells
   // constant from variable bitrate without scanning the whole file.
-  const seekTable = params.vbr && params.frames ? buildSeekTable(params) : null;
+  const seekTable = params.vbr ? buildSeekTable(params) : null;
 
   p = writeAscii(frame, p, params.vbr ? 'Xing' : 'Info');
   p = writeU32(frame, p, seekTable ? 0x0007 : 0x0003);
@@ -115,10 +115,8 @@ export function writeInfoTag(params: InfoTagParameters): Uint8Array {
   }
 
   // --- LAME tag extension ---------------------------------------------------
-  // Only the fields that carry meaning here are filled in. The rest are zero,
-  // which is what every decoder treats as "not reported": replay gain, the ATH
-  // and preset descriptors, and the two CRCs all describe choices this encoder
-  // does not make, and inventing values for them would be worse than absent.
+  // Lowpass, replay gain and the remaining descriptors stay zero, which readers
+  // take as "not reported".
   const lameStart = p;
   p = writeAscii(frame, p, ENCODER_STRING);
 
@@ -142,6 +140,9 @@ export function writeInfoTag(params: InfoTagParameters): Uint8Array {
 
   // Bytes 28-31: length of the audio data, excluding this frame.
   writeU32(frame, lameStart + 28, Math.max(0, params.streamBytes - frameBytes));
+  // Bytes 32-35: CRC of the audio frames, then CRC of this frame up to that field.
+  writeU16(frame, lameStart + 32, lameCrc(params.frames));
+  writeU16(frame, lameStart + 34, lameCrc(frame.subarray(0, lameStart + 34)));
 
   return frame;
 }
@@ -161,7 +162,7 @@ export function writeInfoTag(params: InfoTagParameters): Uint8Array {
 function buildSeekTable(params: InfoTagParameters): Uint8Array | null {
   const audio = params.frames;
   const tagBytes = params.tagBytes ?? 0;
-  if (!audio || params.frameCount <= 0) return null;
+  if (params.frameCount <= 0) return null;
 
   // Walk the frames once, recording where each begins.
   const offsets = new Int32Array(params.frameCount + 1);
@@ -240,6 +241,22 @@ export function infoTagFrameLength(
 function writeAscii(target: Uint8Array, offset: number, text: string): number {
   for (let i = 0; i < text.length; i++) target[offset + i] = text.charCodeAt(i) & 0x7f;
   return offset + text.length;
+}
+
+/** CRC-16 with the reflected polynomial 0xA001, as LAME and ffmpeg compute both tag CRCs. */
+export function lameCrc(data: Uint8Array): number {
+  let crc = 0;
+  for (let i = 0; i < data.length; i++) {
+    crc ^= data[i]!;
+    for (let bit = 0; bit < 8; bit++) crc = crc & 1 ? (crc >>> 1) ^ 0xa001 : crc >>> 1;
+  }
+  return crc;
+}
+
+function writeU16(target: Uint8Array, offset: number, value: number): number {
+  target[offset] = (value >>> 8) & 0xff;
+  target[offset + 1] = value & 0xff;
+  return offset + 2;
 }
 
 function writeU32(target: Uint8Array, offset: number, value: number): number {

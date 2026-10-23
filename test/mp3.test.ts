@@ -75,6 +75,7 @@ import { requantize } from '../src/mp3/requantize.ts';
 import { PsychoacousticModel } from '../src/mp3/psychoacoustic.ts';
 import { fft } from '../src/analyze/fft.ts';
 import { encodeMp3Channels, ENCODER_DELAY } from '../src/mp3/encoder.ts';
+import { lameCrc } from '../src/mp3/xing.ts';
 import { Audio } from '../src/audio.ts';
 
 /** Presents a quantiser result to the decoder's requantiser. */
@@ -1701,6 +1702,19 @@ describe('MP3 encoding through the library', () => {
     }
   });
 
+  test('the LAME extension carries the music and tag CRCs', () => {
+    assert.equal(lameCrc(new TextEncoder().encode('123456789')), 0xbb3d, 'not CRC-16/ARC');
+    for (const vbr of [false, true]) {
+      const bytes = encodeMp3Channels([music(RATE)], RATE, { bitrate: 128, vbr });
+      const { offset, header } = findFrame(bytes, 0)!;
+      const lameAt = offset + TAG_ENCODER_OFFSET + (vbr ? 100 : 0);
+      const field = (at: number) => (bytes[at]! << 8) | bytes[at + 1]!;
+      const audio = bytes.subarray(offset + header.frameLength);
+      assert.equal(field(lameAt + 32), lameCrc(audio), 'the music CRC is wrong');
+      assert.equal(field(lameAt + 34), lameCrc(bytes.subarray(offset, lameAt + 34)), 'the tag CRC is wrong');
+    }
+  });
+
   test('a tag from any encoder is read, not just LAME’s', () => {
     // Gating on a whitelist of encoder names is why other encoders label
     // themselves "LAME". audiobox names itself honestly, so the reader has to
@@ -1747,6 +1761,14 @@ describe('MP3 encoding against ffmpeg', { skip: FFMPEG ? false : 'ffmpeg not ins
     return out;
   }
 
+  test('ffmpeg accepts the tag CRC of a variable-bitrate stream', () => {
+    // The seek table sits inside the CRC range only for VBR.
+    const path = join(dir, 'vbr-crc.mp3');
+    writeFileSync(path, encodeMp3Channels([music(RATE)], RATE, { bitrate: 192, vbr: true }));
+    const args = ['-v', 'error', '-show_entries', 'stream_tags=encoder', '-of', 'default=nk=1:nw=1', path];
+    assert.equal(execFileSync('ffprobe', args).toString().trim(), 'audiobox');
+  });
+
   for (const [bitrate, channels] of [
     [128, 1],
     [192, 2],
@@ -1767,11 +1789,13 @@ describe('MP3 encoding against ffmpeg', { skip: FFMPEG ? false : 'ffmpeg not ins
       // misreports itself breaks every tool that reads metadata before decoding.
       const probe = execFileSync('ffprobe', [
         '-v', 'error',
-        '-show_entries', 'stream=codec_name,sample_rate,channels,bit_rate',
+        '-show_entries', 'stream=codec_name,sample_rate,channels,bit_rate:stream_tags=encoder',
         '-of', 'default=nk=1:nw=1',
         path,
-      ]).toString().trim().split('\n');
-      assert.deepEqual(probe, ['mp3', String(RATE), String(channels), String(bitrate * 1000)]);
+      ]).toString().trim().split('\n').map((line) => line.trim());
+      // ffmpeg reports the encoder name only when the tag CRC is right.
+      const expected = ['mp3', String(RATE), String(channels), String(bitrate * 1000), 'audiobox'];
+      assert.deepEqual(probe, expected);
 
       // Anything on stderr is a complaint: a bad header, a frame it had to
       // resynchronise past, a reservoir it could not resolve.

@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   may take, as the layout defines for VBR, not the highest.
 - **MP3 tag channel mode.** Byte 24 of the LAME extension stayed zero, which the layout reads
   as a mono source at 32 kHz or below. It now holds the channel mode and the sample rate.
+- **MP3 tag CRCs.** The music and tag CRCs of the LAME extension were zero. Both are now
+  computed, as LAME does. Apple Core Audio checks the tag CRC before it trims the priming and
+  padding, so `afconvert` now decodes audiobox MP3s to the exact input length. ffmpeg checks it
+  before it reports the encoder name.
 
 ## [1.1.0] — 2026-08-04
 
