@@ -11,7 +11,7 @@
  * much later.
  */
 
-import { test, describe } from 'node:test';
+import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -249,7 +249,7 @@ describe('MP3 side information and bit reservoir', () => {
 describe('MP3 against real files', { skip: FFMPEG ? false : 'ffmpeg not installed' }, () => {
   let dir: string;
 
-  test('setup', () => {
+  before(() => {
     dir = mkdtempSync(join(tmpdir(), 'audiobox-mp3-'));
   });
 
@@ -380,7 +380,7 @@ describe('MP3 Huffman tables', () => {
 describe('MP3 Huffman decoding against real files', { skip: FFMPEG ? false : 'ffmpeg not installed' }, () => {
   let dir: string;
 
-  test('setup', () => {
+  before(() => {
     dir = mkdtempSync(join(tmpdir(), 'audiobox-huff-'));
   });
 
@@ -494,7 +494,7 @@ describe('MP3 Huffman decoding against real files', { skip: FFMPEG ? false : 'ff
 describe('MP3 decoding against ffmpeg', { skip: FFMPEG ? false : 'ffmpeg not installed' }, () => {
   let dir: string;
 
-  test('setup', () => {
+  before(() => {
     dir = mkdtempSync(join(tmpdir(), 'audiobox-mp3dec-'));
   });
 
@@ -1712,7 +1712,7 @@ describe('MP3 encoding through the library', () => {
 describe('MP3 encoding against ffmpeg', { skip: FFMPEG ? false : 'ffmpeg not installed' }, () => {
   let dir: string;
 
-  test('setup', () => {
+  before(() => {
     dir = mkdtempSync(join(tmpdir(), 'audiobox-mp3enc-'));
   });
 
