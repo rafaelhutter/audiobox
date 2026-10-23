@@ -134,8 +134,8 @@ export function writeInfoTag(params: InfoTagParameters): Uint8Array {
   const sourceRate = [32000, 44100, 48000].indexOf(sampleRate);
   frame[lameStart + 24] = (stereoMode << 2) | (sourceRate << 6);
 
-  // Bytes 28-31: length of the audio data, excluding this frame.
-  writeU32(frame, lameStart + 28, Math.max(0, params.streamBytes - frameBytes));
+  // Bytes 28-31: stream length from this frame on, as LAME and ffmpeg count it.
+  writeU32(frame, lameStart + 28, params.streamBytes);
   // Bytes 32-35: CRC of the audio frames, then CRC of this frame up to that field.
   writeU16(frame, lameStart + 32, lameCrc(params.frames));
   writeU16(frame, lameStart + 34, lameCrc(frame.subarray(0, lameStart + 34)));

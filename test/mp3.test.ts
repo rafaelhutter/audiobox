@@ -1632,6 +1632,8 @@ describe('MP3 encoding through the library', () => {
     const lameAt = first.offset + TAG_ENCODER_OFFSET;
     assert.equal(bytes[lameAt + 9]! & 0x0f, 1, 'the VBR method does not say constant bitrate');
     assert.equal(bytes[lameAt + 20], 128, 'byte 20 is not the constant bitrate');
+    const musicLength = new DataView(bytes.buffer, bytes.byteOffset).getUint32(lameAt + 28);
+    assert.equal(musicLength, bytes.byteLength, 'the music length must count the tag frame');
 
     // The count excludes the tag frame itself, which is what a decoder assumes
     // when it skips that frame and then sizes its output buffer.

@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   computed, as LAME does. Apple Core Audio checks the tag CRC before it trims the priming and
   padding, so `afconvert` now decodes audiobox MP3s to the exact input length. ffmpeg checks it
   before it reports the encoder name.
+- **MP3 tag music length.** Bytes 28-31 of the LAME extension left out the tag frame. They now
+  count from it, as LAME and ffmpeg do, so they equal the Xing byte count.
 
 ## [1.1.0] — 2026-08-04
 
