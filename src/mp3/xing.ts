@@ -72,12 +72,8 @@ export interface InfoTagParameters {
 }
 
 /**
- * Builds the complete leading frame, header and tag together.
- *
- * `Info` rather than `Xing` because the stream is constant-bitrate; the two are
- * the same structure, and the name is how a decoder tells CBR from VBR without
- * scanning. No seek table: it only helps VBR, where byte position and time are
- * not proportional.
+ * Builds the complete leading frame, header and tag together: `Info` for a
+ * constant-bitrate stream, `Xing` with a seek table for a variable-bitrate one.
  */
 export function writeInfoTag(params: InfoTagParameters): Uint8Array {
   const { bitrateKbps, sampleRate, channels, encoderDelay, encoderPadding } = params;
