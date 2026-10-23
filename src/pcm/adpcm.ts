@@ -101,11 +101,6 @@ export function decodeImaAdpcm(
       written += advanced;
       offset += 4 * channels;
     }
-
-    // Skip any frames the block declared but the buffer did not contain.
-    if (produced < perBlock) {
-      written += 0;
-    }
   }
 
   return out;
