@@ -97,5 +97,6 @@ First release.
 - Streaming resampling processes each chunk independently, so filter state does not carry
   across chunk boundaries.
 
+[1.1.0]: https://github.com/jmsansan/audiobox/releases/tag/v1.1.0
 [1.0.1]: https://github.com/jmsansan/audiobox/releases/tag/v1.0.1
-[1.0.0]: https://github.com/jmsansan/audiobox/releases/tag/v1.0.0
+[1.0.0]: https://www.npmjs.com/package/audiobox/v/1.0.0
