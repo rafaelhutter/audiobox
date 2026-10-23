@@ -44,6 +44,8 @@ function readRawF32(path: string): Float32Array {
 function maxDiff(planar: readonly Float32Array[], interleaved: Float32Array): number {
   const channels = planar.length;
   const frames = planar[0]!.length;
+  // A shorter reference would compare against undefined, and NaN never counts as worse.
+  assert.ok(interleaved.length >= frames * channels, 'the reference has fewer frames');
   let worst = 0;
   for (let i = 0; i < frames; i++) {
     for (let c = 0; c < channels; c++) {
