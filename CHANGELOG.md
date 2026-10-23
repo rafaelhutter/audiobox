@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **MP3 VBR tag.** The LAME extension of a variable-bitrate stream claimed constant bitrate,
   so mpg123 reported such files as CBR. Its bitrate byte now holds the lowest bitrate a frame
   may take, as the layout defines for VBR, not the highest.
+- **MP3 tag channel mode.** Byte 24 of the LAME extension stayed zero, which the layout reads
+  as a mono source at 32 kHz or below. It now holds the channel mode and the sample rate.
 
 ## [1.1.0] — 2026-08-04
 

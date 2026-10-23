@@ -1690,6 +1690,17 @@ describe('MP3 encoding through the library', () => {
     assert.ok(decodeMp3(untagged).channelData[0]!.length > signal.length);
   });
 
+  test('the LAME extension reports the channel mode and source rate', () => {
+    // Stereo mode in bits 2-4 (0 mono, 1 stereo), source rate in bits 6-7 (0 32, 1 44.1, 2 48 kHz).
+    for (const [channels, rate, misc] of [[1, 48000, 0x80], [2, 44100, 0x44], [2, 32000, 0x04]] as const) {
+      const source = Array.from({ length: channels }, () => music(rate));
+      const bytes = encodeMp3Channels(source, rate, { bitrate: 128 });
+      const { offset, header } = findFrame(bytes, 0)!;
+      const lameAt = offset + 4 + header.sideInfoSize + 4 + 4 + 4 + 4;
+      assert.equal(bytes[lameAt + 24], misc, `byte 24 for ${channels} channels at ${rate} Hz`);
+    }
+  });
+
   test('a tag from any encoder is read, not just LAME’s', () => {
     // Gating on a whitelist of encoder names is why other encoders label
     // themselves "LAME". audiobox names itself honestly, so the reader has to

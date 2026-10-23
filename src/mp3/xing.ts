@@ -134,6 +134,12 @@ export function writeInfoTag(params: InfoTagParameters): Uint8Array {
   frame[lameStart + 22] = ((encoderDelay & 0x0f) << 4) | ((encoderPadding >> 8) & 0x0f);
   frame[lameStart + 23] = encoderPadding & 0xff;
 
+  // Byte 24 holds the stereo mode in bits 2-4 and the source rate in bits 6-7.
+  // Left zero, it would claim a mono source at 32 kHz or below.
+  const stereoMode = ['mono', 'stereo', 'dual', 'joint'].indexOf(params.mode);
+  const sourceRate = [32000, 44100, 48000].indexOf(sampleRate);
+  frame[lameStart + 24] = (stereoMode << 2) | (sourceRate << 6);
+
   // Bytes 28-31: length of the audio data, excluding this frame.
   writeU32(frame, lameStart + 28, Math.max(0, params.streamBytes - frameBytes));
 
